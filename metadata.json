@@ -1,0 +1,6 @@
+{
+  "name": "CINESTREAM",
+  "description": "A premium responsive video-streaming home page with cinematic layout, custom categories, search, and video playback.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
