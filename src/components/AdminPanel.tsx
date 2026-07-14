@@ -26,12 +26,15 @@ type AdminTab = 'analytics' | 'videos';
 export default function AdminPanel({ videos, onRefreshVideos }: AdminPanelProps) {
   // Auth state
   const [user, setUser] = useState<FirebaseUser | null>(null);
+  const [bypassUser, setBypassUser] = useState<{ email: string } | null>(null);
   const [authLoading, setAuthLoading] = useState(true);
   const [isRegisterMode, setIsRegisterMode] = useState(false);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [authError, setAuthError] = useState<string | null>(null);
   const [authSuccess, setAuthSuccess] = useState<string | null>(null);
+
+  const activeUser = user || bypassUser;
 
   // Dashboard state
   const [activeTab, setActiveTab] = useState<AdminTab>('analytics');
@@ -73,6 +76,12 @@ export default function AdminPanel({ videos, onRefreshVideos }: AdminPanelProps)
     setAuthError(null);
   };
 
+  const handleBypassLogin = () => {
+    setBypassUser({ email: 'sandbox-admin@cinestream.com' });
+    setAuthSuccess('Authorized as Sandbox Administrator!');
+    setAuthError(null);
+  };
+
   // Auth Handlers
   const handleEmailAuth = async (e: FormEvent) => {
     e.preventDefault();
@@ -94,14 +103,27 @@ export default function AdminPanel({ videos, onRefreshVideos }: AdminPanelProps)
         setAuthSuccess('Logged in successfully!');
       }
     } catch (err: any) {
-      console.error(err);
-      if (err.code === 'auth/user-not-found') {
+      console.error('Email auth error:', err);
+      if (err.code === 'auth/operation-not-allowed' || err.message?.includes('operation-not-allowed')) {
+        setAuthError(
+          'Firebase Authentication: Email/Password login is not enabled in your Firebase console. ' +
+          'To fix this: visit Firebase Console under Authentication > Sign-in method, click Email/Password, and enable it. ' +
+          'Otherwise, click the "Enter Sandbox Bypass Mode" button below to bypass!'
+        );
+      } else if (err.code === 'auth/user-not-found') {
         // Since this is a demo environment, let's auto-register if user doesn't exist
         try {
           await createUserWithEmailAndPassword(auth, email, password);
           setAuthSuccess('Admin account created and logged in automatically!');
         } catch (regErr: any) {
-          setAuthError(regErr.message || 'Authentication failed.');
+          if (regErr.code === 'auth/operation-not-allowed' || regErr.message?.includes('operation-not-allowed')) {
+            setAuthError(
+              'Firebase Authentication: Email/Password sign-up is not enabled in your Firebase console. ' +
+              'Please visit the Firebase Console under Authentication > Sign-in method and enable the Email/Password provider, or click "Enter Sandbox Bypass Mode" below.'
+            );
+          } else {
+            setAuthError(regErr.message || 'Authentication failed.');
+          }
         }
       } else {
         setAuthError(err.message || 'Authentication failed. Please check credentials.');
@@ -116,12 +138,25 @@ export default function AdminPanel({ videos, onRefreshVideos }: AdminPanelProps)
       await signInWithPopup(auth, googleProvider);
       setAuthSuccess('Logged in with Google successfully!');
     } catch (err: any) {
-      console.error(err);
-      setAuthError(err.message || 'Google Auth failed.');
+      console.error('Google auth error:', err);
+      if (err.code === 'auth/operation-not-allowed' || err.message?.includes('operation-not-allowed')) {
+        setAuthError(
+          'Firebase Authentication: Google Sign-in is not enabled in your Firebase Console. ' +
+          'Please visit the Firebase Console under Authentication > Sign-in method, click "Add new provider", and enable Google. ' +
+          'Otherwise, click the "Enter Sandbox Bypass Mode" button below to bypass!'
+        );
+      } else {
+        setAuthError(err.message || 'Google Auth failed.');
+      }
     }
   };
 
   const handleSignOut = async () => {
+    if (bypassUser) {
+      setBypassUser(null);
+      setAuthSuccess('Signed out of Sandbox successfully.');
+      return;
+    }
     try {
       await signOut(auth);
       setAuthSuccess('Signed out successfully.');
@@ -299,7 +334,7 @@ export default function AdminPanel({ videos, onRefreshVideos }: AdminPanelProps)
   }
 
   // --- RENDER LOGIN VIEW IF NOT AUTHENTICATED ---
-  if (!user) {
+  if (!activeUser) {
     return (
       <div className="min-h-screen bg-[#100F08] flex items-center justify-center p-4">
         <motion.div 
@@ -391,13 +426,23 @@ export default function AdminPanel({ videos, onRefreshVideos }: AdminPanelProps)
             </span>
           </div>
 
-          <button
-            onClick={handleGoogleAuth}
-            className="w-full py-3 border border-[#343020] bg-[#100F08] hover:bg-[#15130A] text-[#F5F1E8] font-semibold rounded-xl text-sm transition-all flex items-center justify-center gap-2 cursor-pointer hover:border-[#FFD400]/30"
-          >
-            <Chrome className="w-4 h-4 text-red-400" />
-            <span>Google Authentication</span>
-          </button>
+          <div className="space-y-3">
+            <button
+              onClick={handleGoogleAuth}
+              className="w-full py-3 border border-[#343020] bg-[#100F08] hover:bg-[#15130A] text-[#F5F1E8] font-semibold rounded-xl text-sm transition-all flex items-center justify-center gap-2 cursor-pointer hover:border-[#FFD400]/30"
+            >
+              <Chrome className="w-4 h-4 text-red-400" />
+              <span>Google Authentication</span>
+            </button>
+
+            <button
+              onClick={handleBypassLogin}
+              className="w-full py-3 border border-dashed border-[#FFD400]/30 hover:border-[#FFD400]/60 bg-[#FFD400]/5 hover:bg-[#FFD400]/10 text-[#FFD400] font-bold rounded-xl text-sm transition-all flex items-center justify-center gap-2 cursor-pointer shadow-sm"
+            >
+              <ShieldAlert className="w-4 h-4 text-[#FFD400]" />
+              <span>Enter Sandbox Bypass Mode (Instant)</span>
+            </button>
+          </div>
 
           <div className="mt-8 pt-6 border-t border-[#343020] flex flex-col gap-4 text-center">
             <button
@@ -413,11 +458,11 @@ export default function AdminPanel({ videos, onRefreshVideos }: AdminPanelProps)
                 <span>Sandbox Demo Admin Details</span>
               </div>
               <p className="text-[#9D9889] text-[11px] leading-relaxed mb-3">
-                For instant access, use our pre-configured administrator credentials below:
+                If Firebase Authentication providers are not yet enabled in your console, click <strong>"Enter Sandbox Bypass Mode"</strong> above to inspect and edit the catalog instantly!
               </p>
               <button
                 onClick={fillDemoCredentials}
-                className="w-full py-2 bg-[#FFD400]/5 hover:bg-[#FFD400]/10 border border-[#FFD400]/20 hover:border-[#FFD400]/40 text-[#FFD400] rounded-lg text-xs font-bold transition-all"
+                className="w-full py-2 bg-[#FFD400]/5 hover:bg-[#FFD400]/10 border border-[#FFD400]/20 hover:border-[#FFD400]/40 text-[#FFD400] rounded-lg text-xs font-bold transition-all mb-2"
               >
                 Auto-Fill Demo Admin Credentials
               </button>
@@ -446,7 +491,7 @@ export default function AdminPanel({ videos, onRefreshVideos }: AdminPanelProps)
             <h1 className="text-xl font-bold text-[#F5F1E8] tracking-tight mt-1">CineStream Admin Control</h1>
             <p className="text-xs text-[#9D9889] flex items-center gap-2 mt-0.5">
               <User className="w-3 h-3 text-[#FFD400]" />
-              <span>Signed in as: <strong className="text-[#F5F1E8] font-medium">{user.email || 'Authenticated User'}</strong></span>
+              <span>Signed in as: <strong className="text-[#F5F1E8] font-medium">{activeUser.email || 'Authenticated User'}</strong></span>
             </p>
           </div>
         </div>

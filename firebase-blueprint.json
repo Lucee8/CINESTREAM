@@ -1,0 +1,58 @@
+{
+  "entities": {
+    "Video": {
+      "title": "Video",
+      "description": "A video in the CineStream catalog",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "The unique identifier of the video"
+        },
+        "title": {
+          "type": "string",
+          "description": "The title of the video"
+        },
+        "description": {
+          "type": "string",
+          "description": "The description of the video"
+        },
+        "videoUrl": {
+          "type": "string",
+          "description": "The URL of the video file or source"
+        },
+        "thumbnailUrl": {
+          "type": "string",
+          "description": "The URL of the video thumbnail"
+        },
+        "duration": {
+          "type": "string",
+          "description": "The duration of the video"
+        },
+        "views": {
+          "type": "string",
+          "description": "The number of views of the video"
+        },
+        "uploadedAt": {
+          "type": "string",
+          "description": "The upload timestamp/relative string"
+        },
+        "category": {
+          "type": "string",
+          "description": "The category of the video"
+        },
+        "likes": {
+          "type": "string",
+          "description": "The number of likes of the video"
+        }
+      },
+      "required": ["id", "title", "videoUrl", "thumbnailUrl", "category"]
+    }
+  },
+  "firestore": {
+    "videos/{videoId}": {
+      "schema": "Video",
+      "description": "Collection of all videos in CineStream"
+    }
+  }
+}

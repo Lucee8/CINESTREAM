@@ -1,0 +1,39 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // Global Safety Net
+    match /{document=**} {
+      allow read, write: if false;
+    }
+    
+    // Helpers
+    function isValidId(id) {
+      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+    
+    function incoming() {
+      return request.resource.data;
+    }
+    
+    function existing() {
+      return resource.data;
+    }
+    
+    function isValidVideo(data) {
+      return data.id is string && data.id.size() <= 128
+        && data.title is string && data.title.size() <= 500
+        && data.videoUrl is string && data.videoUrl.size() <= 2000
+        && data.thumbnailUrl is string && data.thumbnailUrl.size() <= 2000
+        && data.category is string && data.category.size() <= 200;
+    }
+    
+    // Match videos collection
+    match /videos/{videoId} {
+      allow read: if true;
+      allow create: if isValidId(videoId) && isValidVideo(incoming());
+      allow update: if isValidId(videoId) && isValidVideo(incoming());
+      allow delete: if isValidId(videoId);
+    }
+  }
+}
