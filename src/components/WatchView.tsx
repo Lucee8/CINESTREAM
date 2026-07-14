@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { ArrowLeft, Play, Pause, Volume2, VolumeX, Maximize2, Sparkles, ThumbsUp, Share2, Heart, Tv, UserPlus, Check } from 'lucide-react';
+import { ArrowLeft, Play, Pause, Volume2, VolumeX, Maximize2, Sparkles, ThumbsUp, Share2, Heart, Tv, UserPlus, Check, ExternalLink } from 'lucide-react';
 
 import { motion, AnimatePresence } from 'motion/react';
 import { Video } from '../types';
@@ -15,6 +15,19 @@ interface WatchViewProps {
 export default function WatchView({ videoId, onBack, onSelectVideo, videos = mockVideos }: WatchViewProps) {
   const video = videos.find((v) => v.id === videoId) || videos[0] || mockVideos[0];
   const videoRef = useRef<HTMLVideoElement>(null);
+
+  // Helper to extract YouTube ID and build the embed URL
+  const getYoutubeEmbedUrl = (url: string) => {
+    if (!url) return null;
+    const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|\&v=)([^#\&\?]*).*/;
+    const match = url.match(regExp);
+    if (match && match[2].length === 11) {
+      return `https://www.youtube.com/embed/${match[2]}?autoplay=1&mute=0&rel=0`;
+    }
+    return null;
+  };
+
+  const youtubeEmbedUrl = getYoutubeEmbedUrl(video.videoUrl);
 
   // Video player state
   const [isPlaying, setIsPlaying] = useState(false);
@@ -67,16 +80,13 @@ export default function WatchView({ videoId, onBack, onSelectVideo, videos = moc
     setCurrentTime(0);
     if (videoRef.current) {
       videoRef.current.load();
-      const playPromise = videoRef.current.play();
-      if (playPromise !== undefined) {
-        playPromise
-          .then(() => {
-            setIsPlaying(true);
-          })
-          .catch((err) => {
-            console.log('Autoplay blocked or video changed', err);
-          });
-      }
+      videoRef.current.play()
+        .then(() => {
+          setIsPlaying(true);
+        })
+        .catch((err) => {
+          console.log('Autoplay blocked or video changed', err);
+        });
     }
   }, [videoId]);
 
@@ -90,6 +100,19 @@ export default function WatchView({ videoId, onBack, onSelectVideo, videos = moc
       videoRef.current.play()
         .then(() => setIsPlaying(true))
         .catch(console.error);
+    }
+  };
+
+  // Handle Can Play callback to guarantee immediate playback when media is loaded
+  const handleCanPlay = () => {
+    if (videoRef.current) {
+      videoRef.current.play()
+        .then(() => {
+          setIsPlaying(true);
+        })
+        .catch((err) => {
+          console.log('Autoplay attempted on canplay:', err);
+        });
     }
   };
 
@@ -219,108 +242,124 @@ export default function WatchView({ videoId, onBack, onSelectVideo, videos = moc
           {/* Custom Video Player Container */}
           <div
             id="cinestream-custom-player"
-            className={`relative rounded-xl overflow-hidden bg-[#15130A] border border-[#343020] shadow-2xl transition-all duration-300 group/player`}
+            className={`relative rounded-xl overflow-hidden bg-[#15130A] border border-[#343020] shadow-2xl transition-all duration-300 group/player aspect-video`}
           >
-            <video
-              ref={videoRef}
-              src={video.videoUrl}
-              onTimeUpdate={handleTimeUpdate}
-              onLoadedMetadata={handleLoadedMetadata}
-              onClick={togglePlay}
-              className="w-full h-auto aspect-video object-contain"
-            />
-
-            {/* Custom Control Overlay: Fades in on hover */}
-            <div className="absolute inset-0 bg-gradient-to-t from-[#100F08]/90 via-[#100F08]/20 to-transparent opacity-0 group-hover/player:opacity-100 transition-opacity duration-300 flex flex-col justify-end p-4">
-              
-              {/* Timeline Progress Scrubber */}
-              <div className="w-full flex items-center gap-3 mb-3">
-                <span className="text-xs font-mono text-[#F5F1E8] select-none">
-                  {formatTime(currentTime)}
-                </span>
-                <input
-                  id="video-progress-scrubber"
-                  type="range"
-                  min="0"
-                  max={duration || 100}
-                  step="0.1"
-                  value={currentTime}
-                  onChange={handleScrubChange}
-                  className="flex-1 h-1.5 rounded-lg bg-gray-600/60 appearance-none cursor-pointer accent-[#FFD400] focus:outline-none"
+            {youtubeEmbedUrl ? (
+              <iframe
+                src={youtubeEmbedUrl}
+                title={video.title}
+                className="w-full h-full object-contain bg-black border-0"
+                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                allowFullScreen
+              />
+            ) : (
+              <>
+                <video
+                  ref={videoRef}
+                  src={video.videoUrl}
+                  autoPlay
+                  onPlay={() => setIsPlaying(true)}
+                  onPause={() => setIsPlaying(false)}
+                  onTimeUpdate={handleTimeUpdate}
+                  onLoadedMetadata={handleLoadedMetadata}
+                  onCanPlay={handleCanPlay}
+                  onClick={togglePlay}
+                  className="w-full h-full object-contain"
                 />
-                <span className="text-xs font-mono text-[#9D9889] select-none">
-                  {formatTime(duration)}
-                </span>
-              </div>
 
-              {/* Action Control Buttons */}
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-4">
-                  {/* Play/Pause */}
-                  <button
-                    id="player-toggle-play"
-                    onClick={togglePlay}
-                    className="p-1.5 rounded-full bg-[#FFD400] hover:scale-105 transition-transform text-[#100F08]"
-                  >
-                    {isPlaying ? (
-                      <Pause className="w-5 h-5 fill-[#100F08]" />
-                    ) : (
-                      <Play className="w-5 h-5 fill-[#100F08] ml-0.5" />
-                    )}
-                  </button>
-
-                  {/* Volume controls */}
-                  <div className="flex items-center gap-2 group/volume">
-                    <button
-                      id="player-toggle-mute"
-                      onClick={toggleMute}
-                      className="text-[#F5F1E8] hover:text-[#FFD400] transition-colors"
-                    >
-                      {isMuted ? (
-                        <VolumeX className="w-5 h-5" />
-                      ) : (
-                        <Volume2 className="w-5 h-5" />
-                      )}
-                    </button>
+                {/* Custom Control Overlay: Fades in on hover */}
+                <div className="absolute inset-0 bg-gradient-to-t from-[#100F08]/90 via-[#100F08]/20 to-transparent opacity-0 group-hover/player:opacity-100 transition-opacity duration-300 flex flex-col justify-end p-4">
+                  
+                  {/* Timeline Progress Scrubber */}
+                  <div className="w-full flex items-center gap-3 mb-3">
+                    <span className="text-xs font-mono text-[#F5F1E8] select-none">
+                      {formatTime(currentTime)}
+                    </span>
                     <input
-                      id="player-volume-slider"
+                      id="video-progress-scrubber"
                       type="range"
                       min="0"
-                      max="1"
-                      step="0.05"
-                      value={isMuted ? 0 : volume}
-                      onChange={handleVolumeChange}
-                      className="w-0 overflow-hidden group-hover/volume:w-16 h-1 rounded-lg bg-gray-600 appearance-none cursor-pointer accent-[#FFD400] transition-all duration-300"
+                      max={duration || 100}
+                      step="0.1"
+                      value={currentTime}
+                      onChange={handleScrubChange}
+                      className="flex-1 h-1.5 rounded-lg bg-gray-600/60 appearance-none cursor-pointer accent-[#FFD400] focus:outline-none"
                     />
+                    <span className="text-xs font-mono text-[#9D9889] select-none">
+                      {formatTime(duration)}
+                    </span>
+                  </div>
+
+                  {/* Action Control Buttons */}
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-4">
+                      {/* Play/Pause */}
+                      <button
+                        id="player-toggle-play"
+                        onClick={togglePlay}
+                        className="p-1.5 rounded-full bg-[#FFD400] hover:scale-105 transition-transform text-[#100F08]"
+                      >
+                        {isPlaying ? (
+                          <Pause className="w-5 h-5 fill-[#100F08]" />
+                        ) : (
+                          <Play className="w-5 h-5 fill-[#100F08] ml-0.5" />
+                        )}
+                      </button>
+
+                      {/* Volume controls */}
+                      <div className="flex items-center gap-2 group/volume">
+                        <button
+                          id="player-toggle-mute"
+                          onClick={toggleMute}
+                          className="text-[#F5F1E8] hover:text-[#FFD400] transition-colors"
+                        >
+                          {isMuted ? (
+                            <VolumeX className="w-5 h-5" />
+                          ) : (
+                            <Volume2 className="w-5 h-5" />
+                          )}
+                        </button>
+                        <input
+                          id="player-volume-slider"
+                          type="range"
+                          min="0"
+                          max="1"
+                          step="0.05"
+                          value={isMuted ? 0 : volume}
+                          onChange={handleVolumeChange}
+                          className="w-0 overflow-hidden group-hover/volume:w-16 h-1 rounded-lg bg-gray-600 appearance-none cursor-pointer accent-[#FFD400] transition-all duration-300"
+                        />
+                      </div>
+                    </div>
+
+                    {/* Right controls */}
+                    <div className="flex items-center gap-3">
+                      {/* Theater Mode Toggle */}
+                      <button
+                        id="player-toggle-theater"
+                        onClick={() => setIsTheaterMode(!isTheaterMode)}
+                        className={`hidden sm:flex text-xs font-semibold px-2.5 py-1 rounded-md border transition-all ${
+                          isTheaterMode
+                            ? 'bg-[#FFD400]/10 text-[#FFD400] border-[#FFD400]'
+                            : 'bg-[#1D1B11]/80 text-[#9D9889] border-[#343020] hover:text-[#FFD400]'
+                        }`}
+                      >
+                        {isTheaterMode ? 'Wide Off' : 'Theater Mode'}
+                      </button>
+
+                      {/* Fullscreen */}
+                      <button
+                        id="player-toggle-fullscreen"
+                        onClick={handleFullscreen}
+                        className="text-[#F5F1E8] hover:text-[#FFD400] transition-colors p-1"
+                      >
+                        <Maximize2 className="w-5 h-5" />
+                      </button>
+                    </div>
                   </div>
                 </div>
-
-                {/* Right controls */}
-                <div className="flex items-center gap-3">
-                  {/* Theater Mode Toggle */}
-                  <button
-                    id="player-toggle-theater"
-                    onClick={() => setIsTheaterMode(!isTheaterMode)}
-                    className={`hidden sm:flex text-xs font-semibold px-2.5 py-1 rounded-md border transition-all ${
-                      isTheaterMode
-                        ? 'bg-[#FFD400]/10 text-[#FFD400] border-[#FFD400]'
-                        : 'bg-[#1D1B11]/80 text-[#9D9889] border-[#343020] hover:text-[#FFD400]'
-                    }`}
-                  >
-                    {isTheaterMode ? 'Wide Off' : 'Theater Mode'}
-                  </button>
-
-                  {/* Fullscreen */}
-                  <button
-                    id="player-toggle-fullscreen"
-                    onClick={handleFullscreen}
-                    className="text-[#F5F1E8] hover:text-[#FFD400] transition-colors p-1"
-                  >
-                    <Maximize2 className="w-5 h-5" />
-                  </button>
-                </div>
-              </div>
-            </div>
+              </>
+            )}
           </div>
 
           {/* Video Metadata Panel */}
@@ -341,7 +380,7 @@ export default function WatchView({ videoId, onBack, onSelectVideo, videos = moc
               </div>
 
               {/* Action Row: Like, Share */}
-              <div className="flex items-center gap-2">
+              <div className="flex flex-wrap items-center gap-2">
                 <button
                   id="btn-video-like"
                   onClick={handleLikeClick}
@@ -363,6 +402,17 @@ export default function WatchView({ videoId, onBack, onSelectVideo, videos = moc
                   <Share2 className="w-4 h-4" />
                   Share
                 </button>
+
+                <a
+                  href={video.videoUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  id="btn-video-redirect"
+                  className="flex items-center justify-center gap-2 px-4 py-2 rounded-full border bg-[#FFD400]/10 border-[#FFD400]/30 text-[#FFD400] hover:bg-[#FFD400] hover:text-[#100F08] hover:border-[#FFD400] transition-all text-xs font-bold cursor-pointer select-none"
+                >
+                  <ExternalLink className="w-3.5 h-3.5" />
+                  Redirect to Source
+                </a>
               </div>
             </div>
 

@@ -69,6 +69,20 @@ export default function AdminPanel({ videos, onRefreshVideos }: AdminPanelProps)
     return unsubscribe;
   }, []);
 
+  // Auto-generate thumbnail when Video Stream URL changes (specifically for YouTube URLs)
+  useEffect(() => {
+    if (!formVideoUrl) return;
+
+    // Extract YouTube ID
+    const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|\&v=)([^#\&\?]*).*/;
+    const match = formVideoUrl.match(regExp);
+    const ytId = (match && match[2].length === 11) ? match[2] : null;
+
+    if (ytId) {
+      setFormThumbnailUrl(`https://img.youtube.com/vi/${ytId}/maxresdefault.jpg`);
+    }
+  }, [formVideoUrl]);
+
   // Quick Demo Auto-Fill credentials
   const fillDemoCredentials = () => {
     setEmail('admin@cinestream.com');
@@ -817,8 +831,13 @@ export default function AdminPanel({ videos, onRefreshVideos }: AdminPanelProps)
                     </div>
 
                     <div>
-                      <label className="block text-[10px] font-bold text-[#9D9889] uppercase tracking-wider mb-1.5">
-                        Thumbnail URL <span className="text-[#FFD400]">*</span>
+                      <label className="block text-[10px] font-bold text-[#9D9889] uppercase tracking-wider mb-1.5 flex items-center justify-between">
+                        <span>Thumbnail URL <span className="text-[#FFD400]">*</span></span>
+                        {formVideoUrl.match(/^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|\&v=)([^#\&\?]*).*/) && (
+                          <span className="text-[10px] text-[#FFD400] italic font-semibold">
+                            ✨ Auto-Extracting...
+                          </span>
+                        )}
                       </label>
                       <input
                         type="url"
@@ -828,6 +847,11 @@ export default function AdminPanel({ videos, onRefreshVideos }: AdminPanelProps)
                         onChange={e => setFormThumbnailUrl(e.target.value)}
                         className="w-full px-3 py-2 bg-[#100F08] border border-[#343020] rounded-lg text-[#F5F1E8] text-xs focus:outline-none focus:border-[#FFD400]"
                       />
+                      {formVideoUrl.match(/^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|\&v=)([^#\&\?]*).*/) && (
+                        <p className="text-[10px] text-[#FFD400]/80 mt-1 font-medium italic">
+                          ✨ Auto-filled high-definition thumbnail from YouTube stream ID.
+                        </p>
+                      )}
                     </div>
 
                     <div className="grid grid-cols-3 gap-2">
